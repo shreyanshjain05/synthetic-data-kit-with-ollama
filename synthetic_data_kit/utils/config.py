@@ -9,16 +9,31 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-# Default config location relative to the package
-DEFAULT_CONFIG_PATH = os.path.abspath(
+# Default config location relative to the package (original)
+ORIGINAL_CONFIG_PATH = os.path.abspath(
     os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
                 "configs", "config.yaml")
 )
 
+# Add fallback location inside the package (recommended for installed packages)
+PACKAGE_CONFIG_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.yaml")
+)
+
+# Use internal package path as default
+DEFAULT_CONFIG_PATH = PACKAGE_CONFIG_PATH
+
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     """Load YAML configuration file"""
     if config_path is None:
-        config_path = DEFAULT_CONFIG_PATH
+        # Try each path in order until one exists
+        for path in [PACKAGE_CONFIG_PATH, ORIGINAL_CONFIG_PATH]:
+            if os.path.exists(path):
+                config_path = path
+                break
+        else:
+            # If none exists, use the default (which will likely fail, but with a clear error)
+            config_path = DEFAULT_CONFIG_PATH
     
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Configuration file not found at {config_path}")

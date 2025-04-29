@@ -9,6 +9,18 @@ description = "Tool for generating high quality Synthetic datasets"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
+dependencies = [
+    "datasets>=2.14.0",
+    "pdfminer-six>=20221105",
+    "pydantic>=2.4.0",
+    "python-docx>=0.8.11",
+    "python-pptx>=0.6.21",
+    "pytube>=15.0.0",
+    "pyyaml>=6.0",
+    "requests>=2.31.0",
+    "rich>=13.4.2",
+    "typer>=0.9.0",
+]
 
 # These fields appear in pip show
 summary = "Create and curate synthetic datasets for fine-tuning LLMs"
@@ -51,6 +63,7 @@ synthetic-data-kit = "synthetic_data_kit.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["synthetic_data_kit"]
+include-package-data = true
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -58,6 +71,7 @@ include = [
     "configs/config.yaml",
     "README.md",
     "LICENSE",
+    "MANIFEST.in",
 ]
 
 [tool.black]
