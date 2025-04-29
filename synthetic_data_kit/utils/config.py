@@ -1,0 +1,99 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the terms described in the LICENSE file in
+# the root directory of this source tree.
+# Config Utilities
+import yaml
+import os
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+# Default config location relative to the package
+DEFAULT_CONFIG_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
+                "configs", "config.yaml")
+)
+
+def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
+    """Load YAML configuration file"""
+    if config_path is None:
+        config_path = DEFAULT_CONFIG_PATH
+    
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Configuration file not found at {config_path}")
+    
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
+def get_path_config(config: Dict[str, Any], path_type: str, file_type: Optional[str] = None) -> str:
+    """Get path from configuration based on type and optionally file type"""
+    paths = config.get('paths', {})
+    
+    if path_type == 'input':
+        input_paths = paths.get('input', {})
+        if file_type and file_type in input_paths:
+            return input_paths[file_type]
+        return input_paths.get('default', 'data/input')
+    
+    elif path_type == 'output':
+        output_paths = paths.get('output', {})
+        if file_type and file_type in output_paths:
+            return output_paths[file_type]
+        return output_paths.get('default', 'data/output')
+    
+    else:
+        raise ValueError(f"Unknown path type: {path_type}")
+
+def get_vllm_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Get VLLM configuration"""
+    return config.get('vllm', {
+        'api_base': 'http://localhost:8000/v1',
+        'port': 8000,
+        'model': 'meta-llama/Llama-3.3-70B-Instruct',
+        'max_retries': 3,
+        'retry_delay': 1.0
+    })
+
+def get_generation_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Get generation configuration"""
+    return config.get('generation', {
+        'temperature': 0.7,
+        'top_p': 0.95,
+        'chunk_size': 4000,
+        'overlap': 200,
+        'max_tokens': 4096
+    })
+
+def get_curate_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Get curation configuration"""
+    return config.get('curate', {
+        'threshold': 7.0,
+        'batch_size': 8,
+        'temperature': 0.1
+    })
+
+def get_format_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Get format configuration"""
+    return config.get('format', {
+        'default': 'jsonl',
+        'include_metadata': True,
+        'pretty_json': True
+    })
+
+def get_prompt(config: Dict[str, Any], prompt_name: str) -> str:
+    """Get prompt by name"""
+    prompts = config.get('prompts', {})
+    if prompt_name not in prompts:
+        raise ValueError(f"Prompt '{prompt_name}' not found in configuration")
+    return prompts[prompt_name]
+
+def merge_configs(base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge two configuration dictionaries"""
+    result = base_config.copy()
+    for key, value in override_config.items():
+        if isinstance(value, dict) and key in result and isinstance(result[key], dict):
+            result[key] = merge_configs(result[key], value)
+        else:
+            result[key] = value
+    return result
