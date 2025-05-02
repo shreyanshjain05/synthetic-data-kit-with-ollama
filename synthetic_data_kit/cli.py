@@ -15,6 +15,7 @@ from rich.table import Table
 
 from synthetic_data_kit.utils.config import load_config, get_vllm_config, get_openai_config, get_llm_provider, get_path_config
 from synthetic_data_kit.core.context import AppContext
+from synthetic_data_kit.server.app import run_server
 
 # Initialize Typer app
 app = typer.Typer(
@@ -393,6 +394,34 @@ def save_as(
     except Exception as e:
         console.print(f"L Error: {e}", style="red")
         return 1
+
+
+@app.command("server")
+def server(
+    host: str = typer.Option(
+        "127.0.0.1", "--host", help="Host address to bind the server to"
+    ),
+    port: int = typer.Option(
+        5000, "--port", "-p", help="Port to run the server on"
+    ),
+    debug: bool = typer.Option(
+        False, "--debug", "-d", help="Run the server in debug mode"
+    ),
+):
+    """
+    Start a web interface for the Synthetic Data Kit.
+    
+    This launches a web server that provides a UI for all SDK functionality,
+    including generating and curating QA pairs, as well as viewing
+    and managing generated files.
+    """
+    provider = get_llm_provider(ctx.config)
+    console.print(f"Starting web server with {provider} provider...", style="green")
+    console.print(f"Web interface available at: http://{host}:{port}", style="bold green")
+    console.print("Press CTRL+C to stop the server.", style="italic")
+    
+    # Run the Flask server
+    run_server(host=host, port=port, debug=debug)
 
 
 if __name__ == "__main__":
