@@ -3,7 +3,7 @@
 #
 # This source code is licensed under the terms described in the LICENSE file in
 # the root directory of this source tree.
-# Supports both vLLM and OpenAI (including OpenAI-compatible) providers
+# Supports both vLLM and API endpoint (including OpenAI-compatible) providers
 from typing import List, Dict, Any, Optional, Union, Tuple
 import requests
 import json
@@ -25,7 +25,7 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-    logger.warning("OpenAI package not installed. To use OpenAI provider, install with 'pip install openai>=1.0.0'")
+    logger.warning("OpenAI package not installed. To use API endpoint provider, install with 'pip install openai>=1.0.0'")
 
 class LLMClient:
     def __init__(self, 
@@ -40,9 +40,9 @@ class LLMClient:
         
         Args:
             config_path: Path to config file (if None, uses default)
-            provider: Override provider from config ('vllm' or 'openai')
+            provider: Override provider from config ('vllm' or 'api-endpoint')
             api_base: Override API base URL from config
-            api_key: Override API key for OpenAI (only needed for 'openai' provider)
+            api_key: Override API key for API endpoint (only needed for 'api-endpoint' provider)
             model_name: Override model name from config
             max_retries: Override max retries from config
             retry_delay: Override retry delay from config
@@ -53,22 +53,22 @@ class LLMClient:
         # Determine provider (with CLI override taking precedence)
         self.provider = provider or get_llm_provider(self.config)
         
-        if self.provider == 'openai':
+        if self.provider == 'api-endpoint':
             if not OPENAI_AVAILABLE:
                 raise ImportError("OpenAI package is not installed. Install with 'pip install openai>=1.0.0'")
             
-            # Load OpenAI configuration
-            openai_config = get_openai_config(self.config)
+            # Load API endpoint configuration
+            api_endpoint_config = get_openai_config(self.config)
             
             # Set parameters, with CLI overrides taking precedence
-            self.api_base = api_base or openai_config.get('api_base')
-            self.api_key = api_key or openai_config.get('api_key') or os.environ.get('OPENAI_API_KEY')
-            if not self.api_key and not self.api_base:  # Only require API key for official OpenAI API
-                raise ValueError("API key is required for OpenAI provider. Set in config or OPENAI_API_KEY env var.")
+            self.api_base = api_base or api_endpoint_config.get('api_base')
+            self.api_key = api_key or api_endpoint_config.get('api_key') or os.environ.get('OPENAI_API_KEY')
+            if not self.api_key and not self.api_base:  # Only require API key for official API
+                raise ValueError("API key is required for API endpoint provider. Set in config or OPENAI_API_KEY env var.")
             
-            self.model = model_name or openai_config.get('model')
-            self.max_retries = max_retries or openai_config.get('max_retries')
-            self.retry_delay = retry_delay or openai_config.get('retry_delay')
+            self.model = model_name or api_endpoint_config.get('model')
+            self.max_retries = max_retries or api_endpoint_config.get('max_retries')
+            self.retry_delay = retry_delay or api_endpoint_config.get('retry_delay')
             
             # Initialize OpenAI client
             self._init_openai_client()
@@ -136,7 +136,7 @@ class LLMClient:
         
         verbose = os.environ.get('SDK_VERBOSE', 'false').lower() == 'true'
         
-        if self.provider == 'openai':
+        if self.provider == 'api-endpoint':
             return self._openai_chat_completion(messages, temperature, max_tokens, top_p, verbose)
         else:  # Default to vLLM
             return self._vllm_chat_completion(messages, temperature, max_tokens, top_p, verbose)
@@ -322,7 +322,7 @@ class LLMClient:
         
         verbose = os.environ.get('SDK_VERBOSE', 'false').lower() == 'true'
         
-        if self.provider == 'openai':
+        if self.provider == 'api-endpoint':
             return self._openai_batch_completion(message_batches, temperature, max_tokens, top_p, batch_size, verbose)
         else:  # Default to vLLM
             return self._vllm_batch_completion(message_batches, temperature, max_tokens, top_p, batch_size, verbose)

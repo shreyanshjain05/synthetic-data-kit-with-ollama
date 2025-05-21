@@ -73,13 +73,13 @@ def get_llm_provider(config: Dict[str, Any]) -> str:
     """Get the selected LLM provider
     
     Returns:
-        String with provider name: 'vllm' or 'openai'
+        String with provider name: 'vllm' or 'api-endpoint'
     """
     llm_config = config.get('llm', {})
     provider = llm_config.get('provider', 'vllm')
     print(f"get_llm_provider returning: {provider}")
-    if provider != 'openai' and 'llm' in config and 'provider' in config['llm'] and config['llm']['provider'] == 'openai':
-        print(f"WARNING: Config has 'openai' but returning '{provider}'")
+    if provider != 'api-endpoint' and 'llm' in config and 'provider' in config['llm'] and config['llm']['provider'] == 'api-endpoint':
+        print(f"WARNING: Config has 'api-endpoint' but returning '{provider}'")
     return provider
 
 def get_vllm_config(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -93,9 +93,9 @@ def get_vllm_config(config: Dict[str, Any]) -> Dict[str, Any]:
     })
 
 def get_openai_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Get OpenAI configuration"""
-    return config.get('openai', {
-        'api_base': None,  # None means use default OpenAI API base URL
+    """Get API endpoint configuration"""
+    return config.get('api-endpoint', {
+        'api_base': None,  # None means use default API base URL
         'api_key': None,  # None means use environment variables
         'model': 'gpt-4o',
         'max_retries': 3,
