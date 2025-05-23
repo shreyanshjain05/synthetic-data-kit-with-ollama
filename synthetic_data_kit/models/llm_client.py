@@ -62,9 +62,17 @@ class LLMClient:
             
             # Set parameters, with CLI overrides taking precedence
             self.api_base = api_base or api_endpoint_config.get('api_base')
-            self.api_key = api_key or api_endpoint_config.get('api_key') or os.environ.get('OPENAI_API_KEY')
+            
+            # Check for environment variables
+            api_endpoint_key = os.environ.get('API_ENDPOINT_KEY')
+            print(f"API_ENDPOINT_KEY from environment: {'Found' if api_endpoint_key else 'Not found'}")
+            
+            # Set API key with priority: CLI arg > env var > config
+            self.api_key = api_key or api_endpoint_key or api_endpoint_config.get('api_key')
+            print(f"Using API key: {'From CLI' if api_key else 'From env var' if api_endpoint_key else 'From config' if api_endpoint_config.get('api_key') else 'None'}")
+            
             if not self.api_key and not self.api_base:  # Only require API key for official API
-                raise ValueError("API key is required for API endpoint provider. Set in config or OPENAI_API_KEY env var.")
+                raise ValueError("API key is required for API endpoint provider. Set in config or API_ENDPOINT_KEY env var.")
             
             self.model = model_name or api_endpoint_config.get('model')
             self.max_retries = max_retries or api_endpoint_config.get('max_retries')
@@ -94,10 +102,15 @@ class LLMClient:
         
         # Add API key if provided
         if self.api_key:
+            # Print first few characters of the API key for debugging
+            #print(f"Using API key (first 10 chars): {self.api_key[:10]}...")
             client_kwargs['api_key'] = self.api_key
+        else:
+            print("No API key found!")
         
         # Add base URL if provided (for OpenAI-compatible APIs)
         if self.api_base:
+            print(f"Using API base URL: {self.api_base}")
             client_kwargs['base_url'] = self.api_base
         
         self.openai_client = OpenAI(**client_kwargs)

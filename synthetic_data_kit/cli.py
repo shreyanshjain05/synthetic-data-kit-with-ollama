@@ -49,12 +49,26 @@ def system_check(
         None, "--api-base", help="API base URL to check"
     ),
     provider: Optional[str] = typer.Option(
-        None, "--provider", help="Provider to check ('vllm' or 'openai')"
+        None, "--provider", help="Provider to check ('vllm' or 'api-endpoint')"
     )
 ):
     """
     Check if the selected LLM provider's server is running.
     """
+    # Check for API_ENDPOINT_KEY directly from environment
+    console.print("Environment variable check:", style="bold blue")
+    llama_key = os.environ.get('API_ENDPOINT_KEY')
+    console.print(f"API_ENDPOINT_KEY: {'Present' if llama_key else 'Not found'}")
+    # Debugging sanity test:
+    # if llama_key:
+        # console.print(f"  Value starts with: {llama_key[:10]}...")
+    
+    # To check the rename bug:
+    #console.print("Available environment variables:", style="bold blue")
+    #env_vars = [key for key in os.environ.keys() if 'API' in key or 'KEY' in key or 'TOKEN' in key]
+    #for var in env_vars:
+    #    console.print(f"  {var}")
+    #console.print("")
     # Get provider from args or config
     selected_provider = provider or get_llm_provider(ctx.config)
     
@@ -62,7 +76,16 @@ def system_check(
         # Get API endpoint config
         api_endpoint_config = get_openai_config(ctx.config)
         api_base = api_base or api_endpoint_config.get("api_base")
-        api_key = api_endpoint_config.get("api_key") or os.environ.get("OPENAI_API_KEY")
+        
+        # Check for environment variables
+        api_endpoint_key = os.environ.get('API_ENDPOINT_KEY')
+        console.print(f"API_ENDPOINT_KEY environment variable: {'Found' if api_endpoint_key else 'Not found'}")
+        
+        # Set API key with priority: env var > config
+        api_key = api_endpoint_key or api_endpoint_config.get("api_key")
+        if api_key:
+            console.print(f"API key source: {'Environment variable' if api_endpoint_key else 'Config file'}")
+        
         model = api_endpoint_config.get("model")
         
         # Check API endpoint access
@@ -98,7 +121,7 @@ def system_check(
                     if api_base:
                         console.print(f"Using custom API base: {api_base}", style="yellow")
                     if not api_key and not api_base:
-                        console.print("API key is required. Set in config.yaml or as OPENAI_API_KEY env var", style="yellow")
+                        console.print("API key is required. Set in config.yaml or as API_ENDPOINT_KEY env var", style="yellow")
                     return 1
             except Exception as e:
                 console.print(f"L Error: {str(e)}", style="red")
