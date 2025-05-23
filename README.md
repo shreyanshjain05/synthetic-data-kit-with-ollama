@@ -16,7 +16,7 @@ Multiple tools support standardized formats. However, most of the times your dat
 
 This toolkit simplifies the journey of:
 
-- Using local LLM (via vLLM) to generate examples
+- Using a LLM (vLLM or any local/external API endpoint) to generate examples
 - Modular 4 command flow
 - Converting your existing files to fine-tuning friendly formats
 - Creating synthetic datasets
@@ -63,12 +63,15 @@ To get an overview of commands type:
 ### 1. Tool Setup
 
 - The tool expects respective files to be put in named folders.
-- You also need a vLLM server running the LLM that you will utilize for generating your dataset.
 
 ```bash
 # Create directory structure
 mkdir -p data/{pdf,html,youtube,docx,ppt,txt,output,generated,cleaned,final}
+```
 
+- You also need a LLM backend that you will utilize for generating your dataset, if using vLLM:
+
+```bash
 # Start vLLM server
 # Note you will need to grab your HF Authentication from: https://huggingface.co/settings/tokens
 vllm serve meta-llama/Llama-3.3-70B-Instruct --port 8000
@@ -79,7 +82,7 @@ vllm serve meta-llama/Llama-3.3-70B-Instruct --port 8000
 The flow follows 4 simple steps: `ingest`, `create`, `curate`, `save-as`, please paste your file into the respective folder:
 
 ```bash
-# Check if vLLM server is running
+# Check if your backend is running
 synthetic-data-kit system-check
 
 # Parse a document to text
@@ -109,7 +112,10 @@ The toolkit uses a YAML configuration file (default: `configs/config.yaml`).
 Note, this can be overridden via either CLI arguments OR passing a custom YAML file
 
 ```yaml
-# Example configuration
+# Example configuration using vLLM
+llm:
+  provider: "vllm"
+
 vllm:
   api_base: "http://localhost:8000/v1"
   model: "meta-llama/Llama-3.3-70B-Instruct"
@@ -122,6 +128,19 @@ generation:
 curate:
   threshold: 7.0
   batch_size: 8
+```
+
+or using an API endpoint:
+
+```yaml
+# Example configuration using the llama API
+llm:
+  provider: "api-endpoint"
+
+api-endpoint:
+  api_base: "https://api.llama.com/v1"
+  api_key: "llama-api-key"
+  model: "Llama-4-Maverick-17B-128E-Instruct-FP8"
 ```
 
 ### Customizing Configuration
