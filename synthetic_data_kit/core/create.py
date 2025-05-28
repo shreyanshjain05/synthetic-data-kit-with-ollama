@@ -128,7 +128,7 @@ def process_file(
         if num_pairs is None:
             config = client.config
             generation_config = get_generation_config(config)
-            num_pairs = generation_config.get("num_pairs", 5)
+            num_pairs = generation_config.get("num_cot_examples", 5)
         
         # Process document to generate CoT examples
         result = generator.process_document(
@@ -160,6 +160,16 @@ def process_file(
         # Initialize the CoT generator
         generator = COTGenerator(client, config_path)
         
+        # Get max_examples from args or config
+        max_examples = None
+        if num_pairs is not None:
+            max_examples = num_pairs  # If user specified a number, use it
+        else:
+            config = client.config
+            generation_config = get_generation_config(config)
+            # Get the config value (will be None by default, meaning enhance all)
+            max_examples = generation_config.get("num_cot_enhance_examples")
+        
         # Instead of parsing as text, load the file as JSON with conversations
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -182,6 +192,12 @@ def process_file(
                 # Try to handle as a generic list of conversations
                 conversations = data
                 is_single_conversation = False
+            
+            # Limit the number of conversations if needed
+            if max_examples is not None and len(conversations) > max_examples:
+                if verbose:
+                    print(f"Limiting to {max_examples} conversations (from {len(conversations)} total)")
+                conversations = conversations[:max_examples]
             
             if verbose:
                 print(f"Found {len(conversations)} conversation(s) to enhance")

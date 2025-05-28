@@ -52,9 +52,13 @@ class COTGenerator:
                 print(f"Error parsing output: {e}")
             return None
     
-    def generate_cot_examples(self, document_text: str, num_examples: int = 5) -> List[Dict[str, Any]]:
+    def generate_cot_examples(self, document_text: str, num_examples: int = None) -> List[Dict[str, Any]]:
         """Generate chain-of-thought reasoning examples"""
         verbose = os.environ.get('SDK_VERBOSE', 'false').lower() == 'true'
+        
+        # Get default num_examples from config if not provided
+        if num_examples is None:
+            num_examples = self.generation_config.get("num_cot_examples", 5)
         
         # Get the prompt template
         prompt_template = get_prompt(self.config, "cot_generation")
@@ -133,7 +137,7 @@ class COTGenerator:
         
         return enhanced_conversations
     
-    def process_document(self, document_text: str, num_examples: int = 5, include_simple_steps: bool = False) -> Dict[str, Any]:
+    def process_document(self, document_text: str, num_examples: int = None, include_simple_steps: bool = False) -> Dict[str, Any]:
         """Process a document to generate CoT examples"""
         verbose = os.environ.get('SDK_VERBOSE', 'false').lower() == 'true'
         

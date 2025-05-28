@@ -199,7 +199,7 @@ def create(
         None, "--model", "-m", help="Model to use"
     ),
     num_pairs: Optional[int] = typer.Option(
-        None, "--num-pairs", "-n", help="Target number of QA pairs to generate"
+        None, "--num-pairs", "-n", help="Target number of QA pairs or CoT examples to generate"
     ),
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Show detailed output"
@@ -209,10 +209,11 @@ def create(
     Generate content from text using local LLM inference.
     
     Content types:
-    - qa: Generate question-answer pairs from text
+    - qa: Generate question-answer pairs from text (use --num-pairs to specify how many)
     - summary: Generate a summary of the text
-    - cot: Generate Chain of Thought reasoning examples from text
+    - cot: Generate Chain of Thought reasoning examples from text (use --num-pairs to specify how many)
     - cot-enhance: Enhance existing tool-use conversations with Chain of Thought reasoning
+      (use --num-pairs to limit the number of conversations to enhance, default is to enhance all)
       (for cot-enhance, the input must be a JSON file with either:
        - A single conversation in 'conversations' field
        - An array of conversation objects, each with a 'conversations' field
