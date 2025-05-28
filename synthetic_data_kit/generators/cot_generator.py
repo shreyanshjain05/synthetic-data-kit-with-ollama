@@ -103,6 +103,10 @@ class COTGenerator:
         # Get the prompt template
         prompt_template = get_prompt(self.config, "cot_enhancement")
         
+        if verbose:
+            print(f"Debug - Conversations to enhance structure: {type(conversations)}")
+            print(f"Debug - First conversation: {json.dumps(conversations[0] if conversations else {}, indent=2)[:100]}...")
+        
         # Format the prompt
         conversation_str = json.dumps(conversations, ensure_ascii=False, indent=2)
         prompt = prompt_template.format(

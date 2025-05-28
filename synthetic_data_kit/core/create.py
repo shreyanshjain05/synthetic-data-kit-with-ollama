@@ -176,7 +176,21 @@ def process_file(
                 data = json.load(f)
             
             # Handle different dataset formats
-            if isinstance(data, dict) and "conversations" in data:
+            # First, check for QA pairs format (the most common input format)
+            if isinstance(data, dict) and "qa_pairs" in data:
+                # QA pairs format from "create qa" command (make this the primary format)
+                from synthetic_data_kit.utils.llm_processing import convert_to_conversation_format
+                
+                qa_pairs = data.get("qa_pairs", [])
+                if verbose:
+                    print(f"Converting {len(qa_pairs)} QA pairs to conversation format")
+                
+                conv_list = convert_to_conversation_format(qa_pairs)
+                # Wrap each conversation in the expected format
+                conversations = [{"conversations": conv} for conv in conv_list]
+                is_single_conversation = False
+            # Then handle other conversation formats for backward compatibility
+            elif isinstance(data, dict) and "conversations" in data:
                 # Single conversation with a conversations array
                 conversations = [data]
                 is_single_conversation = True
@@ -217,7 +231,20 @@ def process_file(
                         continue
                     
                     # Enhance this conversation's messages
-                    enhanced_messages = generator.enhance_with_cot(conv_messages, include_simple_steps=verbose)
+                    if verbose:
+                        print(f"Debug - Conv_messages type: {type(conv_messages)}")
+                        print(f"Debug - Conv_messages structure: {conv_messages[:1] if isinstance(conv_messages, list) else 'Not a list'}")
+                    
+                    # Always include simple steps when enhancing QA pairs
+                    enhanced_messages = generator.enhance_with_cot(conv_messages, include_simple_steps=True)
+                    
+                    # Handle nested bug
+                    if enhanced_messages and isinstance(enhanced_messages, list):
+                        # Nested bug
+                        if enhanced_messages and isinstance(enhanced_messages[0], list):
+                            if verbose:
+                                print(f"Debug - Flattening nested array response")
+                            enhanced_messages = enhanced_messages[0]
                     
                     # Create enhanced conversation with same structure
                     enhanced_conv = conversation.copy()
