@@ -7,7 +7,6 @@
 
 import os
 import json
-import asyncio
 from typing import Optional
 from pathlib import Path
 
@@ -42,43 +41,17 @@ class VQAGenerator:
         image.save(buffered, format="PNG")
         return base64.b64encode(buffered.getvalue()).decode('utf-8')
     
-    async def process_messages(self, messages_list, model_name, api_key="your-api-key", api_base="http://localhost:8000/v1"):
-        """Process a list of messages asynchronously using the OpenAI API"""
-        try:
-            from openai import AsyncOpenAI
-        except ImportError:
-            raise ImportError("The 'openai' package is required for this functionality. Please install it using 'pip install openai'.")
-        
-        # Initialize the OpenAI client
-        client = AsyncOpenAI(api_key=api_key, base_url=api_base)
-        
-        tasks = []
-        for messages in messages_list:
-            try:
-                # Asynchronously call the API
-                cr = client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    max_tokens=1024,
-                )
-                tasks.append(cr)
-            except Exception as e:
-                print(f"Request failed: {e}")
-        
-        results = await asyncio.gather(*tasks)
-        return results
-    
-    async def main(self, messages_list, model_name="meta-llama/Llama-3.2-11B-Vision-Instruct"):
-        """Main async function to process messages"""
-        results = await self.process_messages(messages_list, model_name)
-        return results
-    
     def transform(self, messages):
         """Transform messages by adding reasoning to VQA data"""
         verbose = os.environ.get('SDK_VERBOSE', 'false').lower() == 'true'
         
         # Get prompt from config
         prompt = self.config.get("prompt", "")
+        
+        # Get generation config
+        temperature = self.generation_config.get("temperature", 0.7)
+        max_tokens = self.generation_config.get("max_tokens", 1024)
+        batch_size = self.generation_config.get("batch_size", 32)
         
         # Process the messages from the dataset
         # Create a list of message sets for the model
@@ -114,12 +87,15 @@ class VQAGenerator:
         if verbose:
             print(f"Processing {len(messages_list)} VQA items...")
             
-        # Run the async function to process all messages
-        results = asyncio.run(self.main(messages_list))
+        # Use the client's batch_completion method instead of our own async implementation
+        results = self.client.batch_completion(
+            message_batches=messages_list,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            batch_size=batch_size
+        )
         
-        for i, result in enumerate(results):
-            # Extract the response from the result
-            response = result.choices[0].message.content
+        for i, response in enumerate(results):
             # Update the messages with the response
             messages['label'][i] = response
             
