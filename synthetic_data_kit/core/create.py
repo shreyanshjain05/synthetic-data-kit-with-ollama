@@ -13,6 +13,13 @@ from synthetic_data_kit.models.llm_client import LLMClient
 from synthetic_data_kit.generators.qa_generator import QAGenerator
 from synthetic_data_kit.utils.config import get_generation_config
 
+def read_json(file_path):
+    # Read the file
+    with open(file_path, 'r', encoding='utf-8') as f:
+        document_text = f.read()
+    return document_text
+
+
 def process_file(
     file_path: str,
     output_dir: str,
@@ -43,10 +50,6 @@ def process_file(
     # The reason for having this directory logic for now is explained in context.py
     os.makedirs(output_dir, exist_ok=True)
     
-    # Read the file
-    with open(file_path, 'r', encoding='utf-8') as f:
-        document_text = f.read()
-    
     # Initialize LLM client
     client = LLMClient(
         config_path=config_path,
@@ -64,6 +67,8 @@ def process_file(
     # Generate content based on type
     if content_type == "qa":
         generator = QAGenerator(client, config_path)
+
+        document_text = read_json(file_path)
         
         # Get num_pairs from args or config
         if num_pairs is None:
@@ -103,6 +108,8 @@ def process_file(
     
     elif content_type == "summary":
         generator = QAGenerator(client, config_path)
+
+        document_text = read_json(file_path)
         
         # Generate just the summary
         summary = generator.generate_summary(document_text)
@@ -123,6 +130,8 @@ def process_file(
         
         # Initialize the CoT generator
         generator = COTGenerator(client, config_path)
+
+        document_text = read_json(file_path)
         
         # Get num_examples from args or config
         if num_pairs is None:
@@ -159,6 +168,8 @@ def process_file(
         
         # Initialize the CoT generator
         generator = COTGenerator(client, config_path)
+
+        document_text = read_json(file_path)
         
         # Get max_examples from args or config
         max_examples = None
@@ -272,6 +283,135 @@ def process_file(
             
         except json.JSONDecodeError:
             raise ValueError(f"Failed to parse {file_path} as JSON. For cot-enhance, input must be a valid JSON file.")
-    
+    elif content_type == "vqa_add_reasoning":
+        try:
+            # Can we load the json
+            input_data = read_json(file_path)
+            from datasets import Dataset
+            dataset = Dataset.from_dict(input_data)
+        except FileNotFoundError as e:
+            # If the file doesn't exist, try to load it from the dataset hub
+            from huggingface_hub import HfApi
+            from datasets import load_dataset
+
+            hf_api = HfApi()
+            if hf_api.repo_exists(repo_id=file_path, repo_type="dataset"):
+                dataset = load_dataset(file_path)
+            else:
+                # Uplevel error
+                raise e
+        input_split = client.config.get("input_split", None)
+        output_split = client.config.get("output_split", None)
+
+        if input_split is not None:
+            dataset = dataset[input_split]
+
+        # Function to encode an image in base64
+        def encode_image_base64(image):
+            import io
+            import base64
+            buffered = io.BytesIO()
+            image.save(buffered, format="PNG")
+            return base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+        prompt = client.config.get("prompt", "")
+        from openai import AsyncOpenAI
+        import asyncio
+        # Initialize the OpenAI client
+        api_key = "your-api-key"  # Replace with your API key
+        api_base = "http://localhost:8000/v1"  # Replace with your VLLM server URL
+        client = AsyncOpenAI(api_key=api_key, base_url=api_base)
+        
+        # it = iter(dataset['train'])
+        async def process_messages(messages_list, model_name):
+            tasks = []
+            for messages in messages_list:
+                try:
+                    # Asynchronously call the API
+                    cr = client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        max_tokens=1024,
+                    )
+                    tasks.append(cr)
+                except Exception as e:
+                    print(f"Request failed: {e}")
+            results = await asyncio.gather(*tasks)
+            
+            return results
+
+        async def main(messages_list):
+            model_name = "meta-llama/Llama-3.2-11B-Vision-Instruct"  # Replace with your model name
+            results = await process_messages(messages_list, model_name)
+            return results
+
+        # Run the main function
+        def transform(messages):
+            # Process the messages from the dataset
+            # Create a list of message sets for the model
+            messages_list = []
+            
+            for i in range(len(messages['image'])):
+                image = messages['image'][i]
+                query = messages['query'][i]
+                label = messages['label'][i][0] if isinstance(messages['label'][i], list) else messages['label'][i]
+                
+                # Encode the image
+                image_base64 = encode_image_base64(image)
+                
+                # Prepare the messages for the API request
+                message_set = [
+                    {
+                        "role": "system",
+                        "content": prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{image_base64}"},
+                            },
+                            {"type": "text", "text": f"{query} Final answer: {label}"},
+                        ],
+                    }
+                ]
+                messages_list.append(message_set)
+                
+            # Run the async function to process all messages
+            results = asyncio.run(main(messages_list))
+            for i, result in enumerate(results):
+                # Extract the response from the result
+                response = result.choices[0].message.content
+                # Update the messages with the response
+                messages['label'][i] = response
+                # print(f"{messages['label'][i]=}")
+            
+            # You can update the messages with the results if needed
+            # For now, just returning the original messages
+            return messages
+
+        # Get max_examples from args or config
+        max_examples = None
+        if num_pairs is not None:
+            max_examples = num_pairs
+
+        ds = dataset.map(
+            transform,
+            batch_size=128,
+            batched=True,
+            )
+
+        ds_path = output_dir
+        if output_split is not None:
+            # Write output that can be loaded back in with load_dataset
+            ds.to_parquet(f"{ds_path}/{output_split}/data.parquet")
+            meta_data = {"splits":['train']}
+            with open(f'{ds_path}/dataset_dict.json', 'w') as f:
+                f.write(json.dumps(meta_data, indent=4))
+        else:
+            #Just dump it in a parquet file
+            ds.to_parquet(f"{ds_path}/data.parquet")
+
     else:
         raise ValueError(f"Unknown content type: {content_type}")
