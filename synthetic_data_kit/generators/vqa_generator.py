@@ -179,10 +179,16 @@ class VQAGenerator:
             if verbose:
                 print(f"Processing {len(dataset)} examples from dataset")
 
+            # Get batch size from config
+            batch_size = self.generation_config.get("batch_size", 32)
+            
+            if verbose:
+                print(f"Using batch size of {batch_size} for dataset processing")
+                
             # Process the dataset
             ds = dataset.map(
                 self.transform,
-                batch_size=128,
+                batch_size=batch_size,
                 batched=True,
             )
             
