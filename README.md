@@ -351,7 +351,7 @@ Failed: 1
 Total pairs generated: 73
 ```
 
-### Consistent Behavior Across Content Types
+### Chunking logic
 
 Both QA and CoT generation use the same chunking logic for files and directories:
 
