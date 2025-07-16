@@ -15,7 +15,7 @@ paths:
 # LLM Provider configuration
 llm:
   # Provider selection: "vllm" or "api-endpoint"
-  provider: "api-endpoint"
+  provider: "api-endpoint"  # Using api-endpoint for Ollama
 
 # VLLM server configuration
 vllm:
@@ -25,13 +25,22 @@ vllm:
   max_retries: 3                       # Number of retries for API calls
   retry_delay: 1.0                     # Initial delay between retries (seconds)
   
-# API endpoint configuration
+# API endpoint configuration (for Ollama via OpenAI-compatible API)
 api-endpoint:
-  api_base: "https://api.llama.com/v1" # Optional base URL for API endpoint (null for default API)
-  api_key: "llama_api_key"               # API key for API endpoint or compatible service (can use env var instead)
-  model: "Llama-4-Maverick-17B-128E-Instruct-FP8" # Default model to use
-  max_retries: 3                       # Number of retries for API calls
-  retry_delay: 1.0                     # Initial delay between retries (seconds)
+  api_base: "http://localhost:11434/v1" # Ollama's OpenAI-compatible endpoint
+  api_key: "not-needed"                 # Ollama doesn't require an API key
+  model: "llama3:latest"                # Your Ollama model
+  max_retries: 3                        # Number of retries for API calls
+  retry_delay: 1.0                      # Initial delay between retries (seconds)
+
+# Ollama configuration (COMMENTED OUT - not supported by synthetic-data-kit)
+# ollama:
+#   api_base: "http://localhost:11434"   # Base URL for Ollama API
+#   port: 11434                          # Port for Ollama server
+#   model: "llama3:latest"               # Default model to use (adjust to your installed model)
+#   max_retries: 3                       # Number of retries for API calls
+#   retry_delay: 1.0                     # Initial delay between retries (seconds)
+#   stream: false                        # Whether to use streaming responses
 
 # Ingest configuration
 ingest:
@@ -62,6 +71,39 @@ format:
   default: "jsonl"   # Default output format
   include_metadata: true  # Include metadata in output files
   pretty_json: true  # Use indentation in JSON output
+
+# Provider-specific settings for different use cases
+provider_configs:
+  # For local development and testing (using Ollama via api-endpoint)
+  local_dev:
+    provider: "api-endpoint"
+    api_base: "http://localhost:11434/v1"
+    api_key: "not-needed"
+    model: "llama3:latest"
+    generation:
+      temperature: 0.8
+      max_tokens: 2048
+      batch_size: 5    # Smaller batch for local resources
+  
+  # For production with Llama API
+  production:
+    provider: "api-endpoint"
+    api_base: "https://api.llama.com/v1"
+    api_key: "llama_api_key"
+    model: "Llama-4-Maverick-17B-128E-Instruct-FP8"
+    generation:
+      temperature: 0.7
+      max_tokens: 4096
+      batch_size: 32
+  
+  # For high-performance local inference
+  local_vllm:
+    provider: "vllm"
+    model: "meta-llama/Llama-3.3-70B-Instruct"
+    generation:
+      temperature: 0.7
+      max_tokens: 4096
+      batch_size: 64
 
 # Prompts for different tasks
 prompts:
@@ -120,31 +162,17 @@ prompts:
     
   # Chain of Thought generation prompt
   cot_generation: |
-    Create complex reasoning examples from this text that demonstrate chain-of-thought thinking.
+    Generate resume evaluation training examples. Each example must have:
+    - question: asking to evaluate a candidate
+    - reasoning: step-by-step evaluation process  
+    - answer: complete evaluation JSON as a string
     
-    Each example should have:
-    1. A challenging question that requires step-by-step reasoning
-    2. Detailed reasoning steps that break down the problem
-    3. A concise final answer
+    The answer must be a JSON string with these exact fields:
+    id, source, specversion, type, time, subject, datacontenttype, status, intent, response, similarity_score, evaluation_json, candidate_name, candidate_phone, notes, correlationid, traceid, userid, sessionid, processing_duration_ms, model_version, confidence_score, data_version
     
-    Return JSON format only:
+    Use the same structure as this example: {text}
     
-    [
-      {{
-        "question": "Complex question about the text?",
-        "reasoning": "Step 1: First, I need to consider...\nStep 2: Then, I analyze...\nStep 3: Finally, I can conclude...",
-        "answer": "Final answer based on the reasoning."
-      }},
-      {{
-        "question": "Another complex question?",
-        "reasoning": "Step 1: First, I'll analyze...\nStep 2: Next, I need to determine...\nStep 3: Based on this analysis...",
-        "answer": "Final answer drawn from the reasoning."
-      }}
-    ]
-    
-    Text:
-    {text}
-  
+    Return exactly 3 examples as JSON array. No explanations, only JSON:
   # Chain of Thought enhancement prompt
   cot_enhancement: |
     You are an expert reasoning assistant. Your task is to enhance the given conversations by adding chain-of-thought reasoning.
@@ -169,3 +197,9 @@ prompts:
     
     Original conversations:
     {conversations}
+
+# Environment variable mappings (optional)
+env_vars:
+  API_ENDPOINT_KEY: "not-needed"          # For api-endpoint provider (Ollama doesn't need a key)
+  OLLAMA_HOST: "http://localhost:11434"   # For reference
+  VLLM_HOST: "http://localhost:8000"      # For vllm provider
